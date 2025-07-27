@@ -9,7 +9,42 @@ body{
 	background: url(../img/background.jpg) no-repeat;
 	background-size: cover;
 	letter-spacing: 0.2px;
+	
+	font-family: 'Nura', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 }
+
+@font-face {
+    font-family: 'Nura'; /* Il nome del font che userai nel CSS */
+    src: url('../fonts/Nura-Normal.ttf') format('truetype');
+    font-weight: normal; /* Questo associa nura.ttf al peso normale */
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Nura'; /* Il nome del font che userai nel CSS */
+    src: url('../fonts/Nura-Bold.ttf') format('truetype');
+    font-weight: bold; /* Questo associa nura.ttf al peso normale */
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Nura'; /* Il nome del font che userai nel CSS */
+    src: url('../fonts/Nura-Light.ttf') format('truetype');
+    font-weight: 300; /* Questo associa nura.ttf al peso normale */
+    font-style: normal;
+    font-display: swap;
+}
+
+h1 {
+    font-family: 'Nura', sans-serif; /* Anche i titoli useranno Nura */
+    font-weight: bold; /* E qui applicheranno automaticamente nura-bold.ttf */
+}
+p {
+    font-family: 'Nura', sans-serif;
+    font-weight: normal; /* Qui applicheranno nura.ttf */
+}
+
+
 /* PreLoeader Style */
 /* HTML: <div class="loader"></div> */
 .loader {
