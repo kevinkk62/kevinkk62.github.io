@@ -1,6 +1,5 @@
 package com.gitstore.app
 
-import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -18,16 +17,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ContextCompat
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import java.io.File
 import java.net.URL
 
 data class AppItem(
@@ -45,10 +43,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    primary = Color(0xFF6750A4),
-                    background = Color(0xFF1C1B1F),
-                    surface = Color(0xFF2B2930),
-                    onSurface = Color(0xFFE6E1E5)
+                    primary = Color(0xFF90CAF9),
+                    background = Color(0xFF121212),
+                    surface = Color(0xFF1E1E1E),
+                    onSurface = Color(0xFFEEEEEE)
                 )
             ) {
                 Surface(
@@ -68,42 +66,40 @@ fun GitStoreApp() {
     var appList by remember { mutableStateOf<List<AppItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
-    // Funzione per scaricare il JSON dal repository GitHub
     fun fetchApps() {
         isLoading = true
         errorMessage = null
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        coroutineScope.launch {
             try {
-                // Sostituisci con il link RAW del tuo apps.json su GitHub
-                val urlString = "https://raw.githubusercontent.com/kevinkk62/kevinkk62.github.io/main/apps.json"
-                val result = URL(urlString).readText()
-                val jsonArray = JSONArray(result)
-                val tempAppList = mutableListOf<AppItem>()
+                val tempAppList = withContext(Dispatchers.IO) {
+                    val urlString = "https://raw.githubusercontent.com/kevinkk62/kevinkk62.github.io/main/apps.json"
+                    val result = URL(urlString).readText()
+                    val jsonArray = JSONArray(result)
+                    val list = mutableListOf<AppItem>()
 
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    tempAppList.add(
-                        AppItem(
-                            packageName = obj.getString("package_name"),
-                            name = obj.getString("name"),
-                            versionCode = obj.getInt("version_code"),
-                            versionName = obj.getString("version_name"),
-                            description = obj.getString("description"),
-                            apkUrl = obj.getString("apk_url")
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        list.add(
+                            AppItem(
+                                packageName = obj.getString("package_name"),
+                                name = obj.getString("name"),
+                                versionCode = obj.getInt("version_code"),
+                                versionName = obj.getString("version_name"),
+                                description = obj.getString("description"),
+                                apkUrl = obj.getString("apk_url")
+                            )
                         )
-                    )
+                    }
+                    list
                 }
-                withContext(Dispatchers.Main) {
-                    appList = tempAppList
-                    isLoading = false
-                }
+                appList = tempAppList
+                isLoading = false
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    errorMessage = "Errore di caricamento: ${e.localizedMessage}"
-                    isLoading = false
-                }
+                errorMessage = "Errore: ${e.localizedMessage}"
+                isLoading = false
             }
         }
     }
@@ -158,7 +154,7 @@ fun GitStoreApp() {
                 Text(
                     text = "Nessuna app disponibile nel repository.",
                     modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             } else {
                 LazyColumn(
@@ -168,7 +164,6 @@ fun GitStoreApp() {
                 ) {
                     items(appList) { app ->
                         AppCard(app = app) {
-                            // Azione tap su Installa/Aggiorna (Scarica l'APK)
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(app.apkUrl))
                             context.startActivity(intent)
                         }
@@ -206,7 +201,7 @@ fun AppCard(app: AppItem, onInstallClick: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Versione: ${app.versionName} (v${app.versionCode})",
+                        text = "Versione ${app.versionName} (v${app.versionCode})",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -232,7 +227,7 @@ fun AppCard(app: AppItem, onInstallClick: () -> Unit) {
             Text(
                 text = app.description,
                 fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
         }
     }
