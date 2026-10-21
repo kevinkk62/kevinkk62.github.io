@@ -18,7 +18,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Generate Compatible Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.4
+        run: gradle wrapper --gradle-version 8.7
 
       - name: Build APK
         run: ./gradlew assembleDebug
