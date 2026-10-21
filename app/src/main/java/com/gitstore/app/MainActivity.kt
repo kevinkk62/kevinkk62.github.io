@@ -1,30 +1,33 @@
 package com.gitstore.app
 
-import android.content.Context
+import android.app.PendingIntent
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ContextCompat
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.File
-import java.net.HttpURLConnection
 import java.net.URL
 
 data class AppItem(
@@ -37,99 +40,51 @@ data class AppItem(
 )
 
 class MainActivity : ComponentActivity() {
-
-    // Cambia questo URL con quello del TUO file apps.json su GitHub
-    private val jsonRepoUrl = "https://raw.githubusercontent.com/TUO_UTENTE/TUO_REPO/main/apps.json"
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    MainScreen(
-                        repoUrl = jsonRepoUrl,
-                        onInstallClick = { app -> checkPermissionAndDownload(app) }
-                    )
+            MaterialTheme(
+                colorScheme = darkColorScheme(
+                    primary = Color(0xFF6750A4),
+                    background = Color(0xFF1C1B1F),
+                    surface = Color(0xFF2B2930),
+                    onSurface = Color(0xFFE6E1E5)
+                )
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    GitStoreApp()
                 }
             }
         }
-    }
-
-    private fun checkPermissionAndDownload(app: AppItem) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!packageManager.canRequestPackageInstalls()) {
-                Toast.makeText(this, "Autorizza l'installazione di app da questa fonte", Toast.LENGTH_LONG).show()
-                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-                return
-            }
-        }
-        downloadAndInstallApk(app)
-    }
-
-    private fun downloadAndInstallApk(app: AppItem) {
-        Toast.makeText(this, "Download di ${app.name} in corso...", Toast.LENGTH_SHORT).show()
-        
-        // Esegue il download in background
-        Thread {
-            try {
-                val url = URL(app.apkUrl)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connect()
-
-                val apkFile = File(cacheDir, "${app.packageName}.apk")
-                connection.inputStream.use { input ->
-                    apkFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-
-                // Avvia il prompt di installazione nativo
-                runOnUiThread {
-                    installApk(apkFile)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                runOnUiThread {
-                    Toast.makeText(this, "Errore durante il download: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.start()
-    }
-
-    private fun installApk(file: File) {
-        val uri: Uri = FileProvider.getUriForFile(
-            this,
-            "$packageName.provider",
-            file
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-        }
-        startActivity(intent)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(repoUrl: String, onInstallClick: (AppItem) -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    var apps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
+fun GitStoreApp() {
+    var appList by remember { mutableStateOf<List<AppItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    LaunchedEffect(Unit) {
-        scope.launch(Dispatchers.IO) {
+    // Funzione per scaricare il JSON dal repository GitHub
+    fun fetchApps() {
+        isLoading = true
+        errorMessage = null
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             try {
-                val jsonString = URL(repoUrl).readText()
-                val jsonArray = JSONArray(jsonString)
-                val list = mutableListOf<AppItem>()
+                // Sostituisci con il link RAW del tuo apps.json su GitHub
+                val urlString = "https://raw.githubusercontent.com/kevinkk62/kevinkk62.github.io/main/apps.json"
+                val result = URL(urlString).readText()
+                val jsonArray = JSONArray(result)
+                val tempAppList = mutableListOf<AppItem>()
+
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
-                    list.add(
+                    tempAppList.add(
                         AppItem(
                             packageName = obj.getString("package_name"),
                             name = obj.getString("name"),
@@ -141,28 +96,83 @@ fun MainScreen(repoUrl: String, onInstallClick: (AppItem) -> Unit) {
                     )
                 }
                 withContext(Dispatchers.Main) {
-                    apps = list
+                    appList = tempAppList
                     isLoading = false
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
+                    errorMessage = "Errore di caricamento: ${e.localizedMessage}"
                     isLoading = false
                 }
             }
         }
     }
 
+    LaunchedEffect(Unit) {
+        fetchApps()
+    }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text("GitStore") }) }
-    ) { padding ->
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(modifier = Modifier.padding(padding)) {
-                items(apps) { app ->
-                    AppRow(app = app, context = context, onInstallClick = onInstallClick)
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Text("GitStore", fontWeight = FontWeight.Bold, fontSize = 22.sp) 
+                },
+                actions = {
+                    IconButton(onClick = { fetchApps() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Aggiorna lista")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else if (errorMessage != null) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { fetchApps() }) {
+                        Text("Riprova")
+                    }
+                }
+            } else if (appList.isEmpty()) {
+                Text(
+                    text = "Nessuna app disponibile nel repository.",
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(appList) { app ->
+                        AppCard(app = app) {
+                            // Azione tap su Installa/Aggiorna (Scarica l'APK)
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(app.apkUrl))
+                            context.startActivity(intent)
+                        }
+                    }
                 }
             }
         }
@@ -170,57 +180,60 @@ fun MainScreen(repoUrl: String, onInstallClick: (AppItem) -> Unit) {
 }
 
 @Composable
-fun AppRow(app: AppItem, context: Context, onInstallClick: (AppItem) -> Unit) {
-    val installedVersionCode = getInstalledVersionCode(context, app.packageName)
-    
-    val buttonText = when {
-        installedVersionCode == -1 -> "Installa"
-        app.versionCode > installedVersionCode -> "Aggiorna"
-        else -> "Apri"
-    }
-
+fun AppCard(app: AppItem, onInstallClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
+                .fillMaxWidth()
                 .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = app.name, style = MaterialTheme.typography.titleMedium)
-                Text(text = "v${app.versionName}", style = MaterialTheme.typography.bodySmall)
-                Text(text = app.description, style = MaterialTheme.typography.bodyMedium)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = {
-                if (buttonText == "Apri") {
-                    val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                    if (intent != null) context.startActivity(intent)
-                } else {
-                    onInstallClick(app)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = app.name,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Versione: ${app.versionName} (v${app.versionCode})",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-            }) {
-                Text(buttonText)
+                
+                Button(
+                    onClick = onInstallClick,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Installa", fontSize = 14.sp)
+                }
             }
-        }
-    }
-}
 
-fun getInstalledVersionCode(context: Context, packageName: String): Int {
-    return try {
-        val info = context.packageManager.getPackageInfo(packageName, 0)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info.longVersionCode.toInt()
-        } else {
-            @Suppress("DEPRECATION")
-            info.versionCode
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = app.description,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-    } catch (e: PackageManager.NameNotFoundException) {
-        -1
     }
 }
