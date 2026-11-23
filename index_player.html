@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Countdown 21:26 — Spazio</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 45%, #0d1326 0%, #050711 65%, #020308 100%);
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #ffffff;
+    }
+
+    canvas#space {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    /* Leggera nebulosa soffusa sullo sfondo */
+    .nebula {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at 25% 30%, rgba(88, 101, 242, 0.12), transparent 55%),
+        radial-gradient(ellipse at 78% 68%, rgba(168, 85, 247, 0.10), transparent 55%),
+        radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.06), transparent 60%);
+    }
+
+
+    .overlay {
+      position: relative;
+      z-index: 3;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .player {
+      width: min(440px, 92vw);
+      padding: clamp(24px, 5vw, 38px);
+      border-radius: 28px;
+      background: linear-gradient(145deg, rgba(22, 27, 54, .68), rgba(7, 10, 25, .58));
+      border: 1px solid rgba(205, 215, 255, .18);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .42), 0 0 55px rgba(126, 105, 255, .13),
+                  inset 0 1px 0 rgba(255,255,255,.08);
+      -webkit-backdrop-filter: blur(22px);
+      backdrop-filter: blur(22px);
+      color: #fff;
+      text-align: center;
+    }
+
+    .track-title {
+      font-size: clamp(2rem, 8vw, 3.2rem);
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: .08em;
+      margin-bottom: 28px;
+      text-shadow: 0 0 24px rgba(190, 180, 255, .45);
+    }
+
+    .progress-wrap { margin: 0 0 22px; }
+    .progress {
+      width: 100%;
+      height: 6px;
+      appearance: none;
+      border: 0;
+      border-radius: 99px;
+      background: rgba(255,255,255,.2);
+      cursor: pointer;
+      accent-color: #c7b8ff;
+      display: block;
+    }
+    .progress::-webkit-slider-thumb {
+      appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 12px rgba(199,184,255,.8);
+    }
+    .times {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 9px;
+      color: rgba(230,233,255,.68);
+      font-size: .76rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+    }
+    .control {
+      width: 54px;
+      height: 54px;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 50%;
+      color: #fff;
+      background: rgba(255,255,255,.09);
+      display: grid;
+      place-items: center;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      cursor: pointer;
+      transition: transform .18s ease, background .18s ease;
+    }
+    .control:hover { transform: scale(1.06); background: rgba(255,255,255,.16); }
+    .control:active { transform: scale(.96); }
+    .control.play {
+      width: 68px;
+      height: 68px;
+      border: 0;
+      color: #17132a;
+      background: linear-gradient(135deg, #fff, #c9bdff);
+      box-shadow: 0 0 28px rgba(184,165,255,.35);
+      font-size: .9rem;
+      letter-spacing: .06em;
+    }
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 25px;
+      color: rgba(230,233,255,.72);
+    }
+    .volume-row input { flex: 1; accent-color: #c7b8ff; }
+    .error {
+      min-height: 1.2em;
+      margin-top: 15px;
+      color: #ffd1dc;
+      font-size: .8rem;
+    }
+    @media (max-width: 420px) {
+      .player { border-radius: 23px; }
+      .controls { gap: 16px; }
+    }
+
+  </style>
+</head>
+<body>
+  <canvas id="space"></canvas>
+  <div class="nebula"></div>
+
+  <main class="overlay">
+    <section class="player" aria-label="Lettore audio">
+      <h1 class="track-title">м♪✺</h1>
+
+      <audio id="audio" preload="metadata"></audio>
+
+      <div class="progress-wrap">
+        <input class="progress" id="progress" type="range" min="0" max="1000" value="0" aria-label="Posizione audio">
+        <div class="times">
+          <span id="currentTime">0:00</span>
+          <span id="duration">0:00</span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="control" id="restart" type="button" aria-label="Ricomincia">INIZIO</button>
+        <button class="control play" id="playPause" type="button" aria-label="Riproduci">PLAY</button>
+        <button class="control" id="mute" type="button" aria-label="Disattiva audio">MUTO</button>
+      </div>
+
+      <div class="volume-row">
+        <label for="volume">VOLUME</label>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
+      </div>
+      <p class="error" id="error" role="status"></p>
+    </section>
+  </main>
+
+  <script>
+    // --- CAMPO STELLARE IN MOVIMENTO (3D STARFIELD) ---
+    const canvas = document.getElementById('space');
+    const ctx = canvas.getContext('2d');
+
+    let width = 0;
+    let height = 0;
+    let centerX = 0;
+    let centerY = 0;
+
+    // Muovi leggermente il centro prospettico col mouse
+    let targetOffsetX = 0;
+    let targetOffsetY = 0;
+    let currentOffsetX = 0;
+    let currentOffsetY = 0;
+
+    window.addEventListener('mousemove', (e) => {
+      const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+      const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+      targetOffsetX = nx * 90;
+      targetOffsetY = ny * 70;
+    });
+
+    const STAR_COUNT = 420;
+    const stars = [];
+    const starColors = [
+      '255, 255, 255',
+      '207, 236, 255',
+      '255, 244, 214',
+      '224, 212, 255'
+    ];
+
+    function createStar(randomZ = true) {
+      const spread = Math.max(window.innerWidth, window.innerHeight) * 1.4;
+      return {
+        x: (Math.random() - 0.5) * spread,
+        y: (Math.random() - 0.5) * spread,
+        z: randomZ ? Math.random() * 1200 + 1 : 1200,
+        prevX: null,
+        prevY: null,
+        size: Math.random() * 1.6 + 0.5,
+        speed: Math.random() * 2.2 + 2.4,
+        color: starColors[Math.floor(Math.random() * starColors.length)]
+      };
+    }
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      centerX = width / 2;
+      centerY = height / 2;
+    }
+
+    function initStars() {
+      stars.length = 0;
+      for (let i = 0; i < STAR_COUNT; i++) {
+        stars.push(createStar(true));
+      }
+    }
+
+    function animateSpace() {
+      // Leggera scia per dare profondità al movimento
+      ctx.fillStyle = 'rgba(4, 6, 15, 0.32)';
+      ctx.fillRect(0, 0, width, height);
+
+      currentOffsetX += (targetOffsetX - currentOffsetX) * 0.05;
+      currentOffsetY += (targetOffsetY - currentOffsetY) * 0.05;
+
+      const cx = centerX + currentOffsetX;
+      const cy = centerY + currentOffsetY;
+      const fov = 420;
+
+      for (let i = 0; i < stars.length; i++) {
+        const s = stars[i];
+        s.z -= s.speed;
+
+        if (s.z <= 1) {
+          stars[i] = createStar(false);
+          continue;
+        }
+
+        const scale = fov / s.z;
+        const sx = cx + s.x * scale;
+        const sy = cy + s.y * scale;
+
+        // Nascondi stelle fuori schermo
+        if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) {
+          stars[i] = createStar(false);
+          continue;
+        }
+
+        const depthRatio = 1 - s.z / 1200;
+        const radius = Math.max(0.3, s.size * scale * 0.65);
+        const alpha = Math.min(1, Math.max(0.15, depthRatio * 1.15));
+
+        if (s.prevX !== null && s.prevY !== null) {
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(${s.color}, ${alpha * 0.55})`;
+          ctx.lineWidth = radius * 0.9;
+          ctx.lineCap = 'round';
+          ctx.moveTo(s.prevX, s.prevY);
+          ctx.lineTo(sx, sy);
+          ctx.stroke();
+        }
+
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(${s.color}, ${alpha})`;
+        ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        s.prevX = sx;
+        s.prevY = sy;
+      }
+
+      requestAnimationFrame(animateSpace);
+    }
+
+    // --- LETTORE AUDIO ---
+    const audio = document.getElementById('audio');
+    const playPause = document.getElementById('playPause');
+    const restart = document.getElementById('restart');
+    const mute = document.getElementById('mute');
+    const progress = document.getElementById('progress');
+    const currentTimeEl = document.getElementById('currentTime');
+    const durationEl = document.getElementById('duration');
+    const volume = document.getElementById('volume');
+    const error = document.getElementById('error');
+
+    // Il file deve trovarsi nella stessa cartella di index.html.
+    audio.src = new URL('./mia.m4a', window.location.href).href;
+    audio.volume = Number(volume.value);
+
+    function formatTime(seconds) {
+      if (!Number.isFinite(seconds)) return '0:00';
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = Math.floor(seconds % 60);
+      return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+    }
+
+    playPause.addEventListener('click', async () => {
+      if (audio.paused) {
+        try {
+          error.textContent = '';
+          await audio.play();
+        } catch (err) {
+          error.textContent = 'Non riesco ad avviare mia.m4a. Verifica il nome e il formato del file.';
+        }
+      } else {
+        audio.pause();
+      }
+    });
+
+    audio.addEventListener('play', () => {
+      playPause.textContent = 'PAUSA';
+      playPause.setAttribute('aria-label', 'Pausa');
+    });
+
+    audio.addEventListener('pause', () => {
+      playPause.textContent = 'PLAY';
+      playPause.setAttribute('aria-label', 'Riproduci');
+    });
+
+    audio.addEventListener('loadedmetadata', () => {
+      durationEl.textContent = formatTime(audio.duration);
+      error.textContent = '';
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      currentTimeEl.textContent = formatTime(audio.currentTime);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        progress.value = String(Math.round((audio.currentTime / audio.duration) * 1000));
+      }
+    });
+
+    audio.addEventListener('error', () => {
+      error.textContent = 'File mia.m4a non trovato oppure formato audio non supportato dal browser.';
+    });
+
+    progress.addEventListener('input', () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = (Number(progress.value) / 1000) * audio.duration;
+      }
+    });
+
+    restart.addEventListener('click', () => {
+      audio.currentTime = 0;
+      if (audio.paused) {
+        audio.play().catch(() => {
+          error.textContent = 'Impossibile avviare mia.m4a.';
+        });
+      }
+    });
+
+    mute.addEventListener('click', () => {
+      audio.muted = !audio.muted;
+      mute.textContent = audio.muted ? 'AUDIO' : 'MUTO';
+      mute.setAttribute('aria-label', audio.muted ? 'Attiva audio' : 'Disattiva audio');
+    });
+
+    volume.addEventListener('input', () => {
+      audio.volume = Number(volume.value);
+      audio.muted = audio.volume === 0;
+      mute.textContent = audio.muted ? 'AUDIO' : 'MUTO';
+    });
+
+    audio.load();
+
+    // --- AVVIO DELLO SFONDO ANIMATO ---
+    resizeCanvas();
+    initStars();
+    animateSpace();
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      initStars();
+    });
+
+  </script>
+</body>
+</html>
